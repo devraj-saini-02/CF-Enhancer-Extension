@@ -1,4 +1,4 @@
-# Codeforces Matrix Analyzer 🚀
+# Codeforces Analyzer 🚀
 
 A polished, native-looking Google Chrome extension designed to seamlessly inject a powerful training matrix directly into Codeforces user profile pages. Analyze yours or any competitor's strengths and target areas at a single glance with an automated, relative-density skill heatmap.
 
