@@ -1,0 +1,621 @@
+/* ================================================================
+   Codeforces Matrix Analyzer — styles.css  v2.0
+   All selectors namespaced with .cfmatrix- to prevent page leakage.
+
+   Key changes from v1:
+     · No nav-tab styles (widget auto-injects, no click to reveal)
+     · Color boxes are strict 16 × 16 px SQUARES (border-radius: 0)
+     · Widget has its own header strip with "Matrix Analysis" title
+     · Typography & borders match Codeforces native page exactly
+   ================================================================ */
+
+/* ----------------------------------------------------------------
+   WIDGET CONTAINER
+   The outermost wrapper injected into #pageContent.
+   Mimics the visual weight of a native Codeforces .roundbox.
+---------------------------------------------------------------- */
+.cfmatrix-widget {
+  display: block;
+  font-family: verdana, arial, sans-serif;
+  font-size: 13px;
+  color: #333333;
+  margin: 14px 0 20px 0;
+  border: 1px solid #b9b9b9;
+  border-radius: 3px;
+  background-color: #ffffff;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+/* ----------------------------------------------------------------
+   WIDGET HEADER STRIP
+   Matches the visual style of "Rating-Based Heatmap" and
+   "Problem Ratings" panels that appear below on the same page.
+   Layout: title on left, [legend + 🔄] group pinned to the right.
+---------------------------------------------------------------- */
+.cfmatrix-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: linear-gradient(to bottom, #f8f8f8 0%, #efefef 100%);
+  border-bottom: 1px solid #d8d8d8;
+  border-radius: 2px 2px 0 0;
+}
+
+/* Title — same weight & size as the other extension headings on the page */
+.cfmatrix-title {
+  font-family: verdana, arial, sans-serif;
+  font-size: 15px;
+  font-weight: bold;
+  color: #1a1a1a;
+  letter-spacing: 0;
+}
+
+/* Right-side wrapper: legend + reset emoji, always flush to the right */
+.cfmatrix-header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+/* Emoji-only reset button — top-right of the header bar */
+.cfmatrix-reset-btn {
+  font-size: 15px;
+  line-height: 1;
+  background: none;
+  border: none;
+  padding: 3px 5px;
+  margin: 0;
+  cursor: pointer;
+  border-radius: 4px;
+  color: inherit;
+  transition: background-color 0.12s ease, transform 0.15s ease;
+  user-select: none;
+  opacity: 0.7;
+}
+
+.cfmatrix-reset-btn:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+  opacity: 1;
+  transform: rotate(30deg);
+}
+
+.cfmatrix-reset-btn:active {
+  transform: rotate(180deg);
+}
+
+/* ----------------------------------------------------------------
+   LOADING STATE
+---------------------------------------------------------------- */
+.cfmatrix-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 14px;
+  color: #888888;
+  font-size: 13px;
+}
+
+.cfmatrix-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid #e0e0e0;
+  border-top-color: #aaaaaa;
+  border-radius: 50%;
+  animation: cfmatrix-spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes cfmatrix-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ----------------------------------------------------------------
+   ERROR STATE
+---------------------------------------------------------------- */
+.cfmatrix-error {
+  padding: 12px 14px;
+  margin: 10px;
+  background-color: #fff5f5;
+  border: 1px solid #f0c0c0;
+  border-radius: 3px;
+  color: #c0392b;
+  font-size: 13px;
+}
+
+/* ================================================================
+   CONTROL BAR
+================================================================ */
+.cfmatrix-control-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 7px 12px;
+  background-color: #fafafa;
+  border-bottom: 1px solid #e1e1e1;
+  box-sizing: border-box;
+  justify-content: space-between;
+}
+
+/* Left controls group — topic + rating stay together */
+.cfmatrix-control-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Right group — legend pinned to far right */
+.cfmatrix-control-right {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* ---- Topic Dropdown ---- */
+.cfmatrix-dropdown-wrap {
+  position: relative;
+}
+
+.cfmatrix-dropdown-btn {
+  font-family: verdana, arial, sans-serif;
+  font-size: 12px;
+  color: #333333;
+  background-color: #ffffff;
+  border: 1px solid #c4c4c4;
+  border-radius: 3px;
+  padding: 4px 10px;
+  cursor: pointer;
+  min-width: 100px;
+  text-align: left;
+  white-space: nowrap;
+  transition: background-color 0.1s, border-color 0.1s, box-shadow 0.1s;
+}
+
+.cfmatrix-dropdown-btn:hover {
+  background-color: #f0f4ff;
+  border-color: #7aace8;
+  box-shadow: 0 0 0 2px rgba(122, 172, 232, 0.18);
+}
+
+.cfmatrix-dropdown-list {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 0;
+  z-index: 9999;
+  background-color: #ffffff;
+  border: 1px solid #b9b9b9;
+  border-radius: 2px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.10);
+  min-width: 230px;
+  padding: 4px 0;
+}
+
+.cfmatrix-dropdown-search {
+  display: block;
+  width: calc(100% - 16px);
+  margin: 6px 8px 4px;
+  padding: 4px 7px;
+  font-family: verdana, arial, sans-serif;
+  font-size: 12px;
+  color: #333333;
+  border: 1px solid #cccccc;
+  border-radius: 2px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.cfmatrix-dropdown-search:focus {
+  border-color: #6699cc;
+}
+
+.cfmatrix-dropdown-items {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.cfmatrix-dropdown-items::-webkit-scrollbar { width: 5px; }
+.cfmatrix-dropdown-items::-webkit-scrollbar-track { background: #f4f4f4; }
+.cfmatrix-dropdown-items::-webkit-scrollbar-thumb { background: #cccccc; border-radius: 3px; }
+.cfmatrix-dropdown-items::-webkit-scrollbar-thumb:hover { background: #aaaaaa; }
+
+.cfmatrix-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-family: verdana, arial, sans-serif;
+  font-size: 12px;
+  color: #333333;
+  user-select: none;
+  transition: background-color 0.08s;
+}
+
+.cfmatrix-dropdown-item:hover {
+  background-color: #edf2fb;
+}
+
+.cfmatrix-dropdown-item input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+  accent-color: #31599a;
+  flex-shrink: 0;
+}
+
+/* ---- Rating Shifter ---- */
+.cfmatrix-rating-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cfmatrix-shift-btn {
+  font-family: verdana, arial, sans-serif;
+  font-size: 11px;
+  color: #333333;
+  background-color: #ffffff;
+  border: 1px solid #b9b9b9;
+  border-radius: 2px;
+  padding: 4px 9px;
+  cursor: pointer;
+  line-height: 1;
+  transition: background-color 0.1s, border-color 0.1s;
+  user-select: none;
+}
+
+.cfmatrix-shift-btn:hover {
+  background-color: #ddeeff;
+  border-color: #6699cc;
+}
+
+.cfmatrix-shift-btn:active {
+  background-color: #c5daf5;
+}
+
+.cfmatrix-rating-label {
+  font-family: verdana, arial, sans-serif;
+  font-size: 12px;
+  font-weight: bold;
+  color: #333333;
+  min-width: 96px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* (reset button styles are defined in the header bar section above) */
+
+/* ---- Legend (lives in .cfmatrix-control-right, far right of control bar) ---- */
+.cfmatrix-legend {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: verdana, arial, sans-serif;
+  font-size: 11px;
+  color: #555555;
+  white-space: nowrap;
+  padding-left: 12px;
+  border-left: 1px solid #d0d0d0;
+}
+
+/* Legend squares match the 16×16 matrix cell squares exactly */
+.cfmatrix-legend-sq {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 0;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.cfmatrix-legend-solved    { background-color: rgba(0,   168, 67,  0.80); }
+.cfmatrix-legend-attempted { background-color: rgba(255, 133, 27,  0.80); }
+
+/* ================================================================
+   TABLE WRAPPER — horizontal scroll for narrow viewports
+================================================================ */
+.cfmatrix-table-wrap {
+  overflow-x: auto;
+  overflow-y: visible;        /* rows expand downward freely */
+  background-color: #ffffff;
+}
+
+.cfmatrix-table-wrap::-webkit-scrollbar        { height: 5px; }
+.cfmatrix-table-wrap::-webkit-scrollbar-track  { background: #f4f4f4; }
+.cfmatrix-table-wrap::-webkit-scrollbar-thumb  { background: #cccccc; border-radius: 3px; }
+.cfmatrix-table-wrap::-webkit-scrollbar-thumb:hover { background: #aaaaaa; }
+
+/* ================================================================
+   MATRIX TABLE
+================================================================ */
+.cfmatrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-family: verdana, arial, sans-serif;
+  font-size: 13px;
+  color: #333333;
+  background-color: #ffffff;
+}
+
+/* ---- Column headers ---- */
+.cfmatrix-th {
+  font-family: verdana, arial, sans-serif;
+  font-size: 12px;
+  font-weight: bold;
+  color: #444444;
+  background-color: #f4f4f4;
+  border: 1px solid #b9b9b9;  /* outer table border weight for header */
+  padding: 6px 10px;
+  text-align: center;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.cfmatrix-corner-th {
+  text-align: left;
+  min-width: 145px;
+  background-color: #ebebeb;
+  font-size: 11px;
+  color: #666666;
+}
+
+.cfmatrix-rating-th {
+  min-width: 80px;
+}
+
+/* ---- Row alternating background ---- */
+.cfmatrix-row:nth-child(even) .cfmatrix-td {
+  background-color: #fafafa;
+}
+
+.cfmatrix-row .cfmatrix-td {
+  transition: background-color 0.08s ease;
+}
+
+.cfmatrix-row:hover .cfmatrix-td {
+  background-color: #eef4ff;
+}
+
+/* ---- Generic cell ---- */
+.cfmatrix-td {
+  border: 1px solid #e1e1e1;   /* light inner dividers */
+  vertical-align: middle;
+  background-color: #ffffff;
+  font-family: verdana, arial, sans-serif;
+  font-size: 13px;
+  color: #333333;
+}
+
+/* ---- Topic label cell ---- */
+.cfmatrix-topic-td {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+  border-right: 1px solid #b9b9b9;  /* heavier separator between label & data */
+  min-width: 145px;
+}
+
+/* ---- Data cell: padding creates the white breathing gap ---- */
+.cfmatrix-data-td {
+  padding: 6px;               /* 6px on all 4 sides — req. §3 */
+  text-align: center;
+}
+
+/* ---- Cell flex row holding the two squares ---- */
+.cfmatrix-cell-flex {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;                   /* 3px horizontal gap between squares — req. §3 */
+}
+
+/* ================================================================
+   COLOUR SQUARES  (16 × 16 px, sharp corners, no border-radius)
+================================================================ */
+.cfmatrix-sq {
+  display: inline-block;
+  width: 16px;                /* exact square — req. §3 */
+  height: 16px;               /* exact square — req. §3 */
+  border-radius: 0;           /* completely sharp corners — req. §3 */
+  flex-shrink: 0;
+  transition: opacity 0.12s ease;
+}
+
+/* Hover: subtle lift on active squares */
+.cfmatrix-sq:not(.cfmatrix-sq-inactive):hover {
+  opacity: 0.82;
+}
+
+/* Inactive / zero-data: flat muted grey, pointer-events off */
+.cfmatrix-sq-inactive {
+  background-color: #f4f4f4 !important;
+  cursor: default !important;
+  pointer-events: none;
+}
+
+/* ================================================================
+   OVERLAY CARD (problem list)
+   FIX: strict height bottleneck, wrapping links, clean scrollbar
+================================================================ */
+
+/* The overlay <tr> and its <td> wrapper must be fully transparent */
+.cfmatrix-overlay-tr {
+  background-color: transparent !important;
+}
+
+.cfmatrix-overlay-tr:hover .cfmatrix-overlay-td {
+  background-color: transparent !important;
+}
+
+.cfmatrix-overlay-td {
+  padding: 0 !important;
+  border: none !important;
+  background-color: transparent !important;
+}
+
+/* ---- Outer card shell ----
+   overflow: hidden clips the animation; the scrollable region is
+   entirely inside .cfmatrix-overlay-list, not the card itself,
+   so the card's height is determined by its children naturally.
+   box-sizing: border-box ensures margin / border don't expand it. */
+.cfmatrix-overlay-card {
+  box-sizing: border-box;
+  max-height: 200px;           /* hard ceiling — req. §1 */
+  display: flex;
+  flex-direction: column;      /* header stays pinned, list scrolls */
+  margin: 3px 8px 8px 8px;
+  background-color: #ffffff;
+  border: 1px solid #b9b9b9;
+  border-radius: 3px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.10);
+  overflow: hidden;            /* clips border-radius on children */
+  font-family: verdana, arial, sans-serif;
+  font-size: 12px;
+  animation: cfmatrix-fadein 0.14s ease;
+}
+
+@keyframes cfmatrix-fadein {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Pinned header strip (never scrolls) ---- */
+.cfmatrix-overlay-header {
+  box-sizing: border-box;
+  flex-shrink: 0;              /* never squashed by list growth */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background-color: #f6f6f6;
+  border-bottom: 1px solid #e1e1e1;
+  font-size: 12px;
+}
+
+.cfmatrix-overlay-subtitle {
+  flex-grow: 1;
+  font-size: 11px;
+  color: #666666;
+  /* allow long tag names to wrap rather than push the close button off */
+  white-space: normal;
+  word-break: break-word;
+}
+
+.cfmatrix-overlay-close {
+  flex-shrink: 0;
+  font-family: verdana, arial, sans-serif;
+  font-size: 11px;
+  color: #888888;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 1px 5px;
+  transition: background-color 0.1s, border-color 0.1s, color 0.1s;
+}
+
+.cfmatrix-overlay-close:hover {
+  background-color: #fde8e8;
+  border-color: #d09090;
+  color: #c0392b;
+}
+
+/* ---- Scrollable links region ----
+   This element is the ONLY scroll container.
+   overflow-y: auto  → vertical scrollbar appears only when needed
+   overflow-x: hidden → prevents horizontal bleed / sideways scroll
+   padding-right: 12px → keeps text clear of the scrollbar thumb     */
+.cfmatrix-overlay-list {
+  box-sizing: border-box;      /* req. §1 — padding included in height */
+  flex: 1 1 auto;              /* take remaining height inside the card */
+  overflow-y: auto;            /* req. §1 */
+  overflow-x: hidden;          /* req. §1 */
+  padding: 6px 12px 6px 10px; /* right=12px guards against scrollbar overlap — req. §3 */
+  /* flex-direction / gap replaced by per-link margin for wrapping support */
+}
+
+/* ---- Custom scrollbar — thin, neutral, CF-palette ---- */
+.cfmatrix-overlay-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cfmatrix-overlay-list::-webkit-scrollbar-track {
+  background: #f1f1f1;         /* req. §3 — light grey track */
+  border-radius: 3px;
+}
+
+.cfmatrix-overlay-list::-webkit-scrollbar-thumb {
+  background: #c1c1c1;         /* req. §3 — medium grey thumb */
+  border-radius: 3px;
+}
+
+.cfmatrix-overlay-list::-webkit-scrollbar-thumb:hover {
+  background: #999999;
+}
+
+/* ---- Individual problem link ----
+   display: block + width: 100% → fills the list width
+   white-space: normal + word-break: break-word → long names wrap cleanly
+   margin-bottom: 6px → comfortable breathing room between entries      */
+.cfmatrix-prob-link {
+  display: block;              /* req. §2 */
+  width: 100%;                 /* req. §2 */
+  box-sizing: border-box;      /* req. §1 */
+  font-family: verdana, arial, sans-serif;
+  font-size: 12px;
+  color: #31599a;              /* CF blue — req. §4 */
+  text-decoration: none;
+  padding: 4px 0;              /* req. §2 — vertical breathing room */
+  margin-bottom: 6px;         /* req. §2 — spacing between links */
+  white-space: normal;         /* req. §2 — allow wrapping */
+  word-break: break-word;      /* req. §2 — break very long names */
+  overflow: visible;           /* no clipping — text must wrap, not clip */
+  line-height: 1.45;
+  transition: color 0.1s;
+}
+
+/* Remove the trailing margin on the last link so the list
+   doesn't have unnecessary extra space at the bottom */
+.cfmatrix-prob-link:last-child {
+  margin-bottom: 0;
+}
+
+.cfmatrix-prob-link:hover {
+  text-decoration: underline;  /* req. §4 */
+  color: #1a3a6a;
+}
+
+.cfmatrix-prob-rating {
+  display: inline;
+  font-size: 11px;
+  color: #888888;
+  font-weight: normal;
+  white-space: nowrap;         /* rating badge stays on one token */
+}
+
+/* ================================================================
+   RESPONSIVE ADJUSTMENTS
+================================================================ */
+@media (max-width: 800px) {
+  .cfmatrix-control-bar {
+    gap: 7px;
+    padding: 7px 8px;
+  }
+  .cfmatrix-corner-th,
+  .cfmatrix-topic-td {
+    min-width: 110px;
+    font-size: 11px;
+  }
+  .cfmatrix-rating-th {
+    min-width: 66px;
+    font-size: 11px;
+  }
+}

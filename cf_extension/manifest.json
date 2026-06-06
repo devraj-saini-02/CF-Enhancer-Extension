@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Codeforces Analyzer",
+  "version": "2.0.0",
+  "description": "Automatically injects a polished training matrix into Codeforces profile pages — analysing solved and attempted problems by topic and rating band.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://codeforces.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://codeforces.com/profile/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
