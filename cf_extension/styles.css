@@ -2,6 +2,10 @@
    Codeforces Problem Tracker — styles.css  v3.0
    All selectors namespaced with .cfmatrix- to prevent page leakage.
 
+   v3 additions:
+     · Dark mode ONLY via body.dark / body[data-theme="dark"] — CF's own
+     · .cfmatrix-info-banner for pagination notice
+     · .cfmatrix-empty-placeholder for zero-topics state
    ================================================================ */
 
 /* ================================================================
@@ -106,19 +110,6 @@
   font-size: 13px;
 }
 
-/* ================================================================
-   INFO BANNER  (Gap 2 — paginated fetch notice)
-================================================================ */
-.cfmatrix-info-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  background-color: #f0f6ff;
-  border-bottom: 1px solid #c8ddf5;
-  font-size: 12px;
-  color: #2c5f9e;
-}
 
 /* ================================================================
    EMPTY PLACEHOLDER  (Bug fix — zero topics selected)
