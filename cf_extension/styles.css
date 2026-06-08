@@ -1,19 +1,12 @@
 /* ================================================================
-   Codeforces Matrix Analyzer — styles.css  v2.0
+   Codeforces Problem Tracker — styles.css  v3.0
    All selectors namespaced with .cfmatrix- to prevent page leakage.
 
-   Key changes from v1:
-     · No nav-tab styles (widget auto-injects, no click to reveal)
-     · Color boxes are strict 16 × 16 px SQUARES (border-radius: 0)
-     · Widget has its own header strip with "Matrix Analysis" title
-     · Typography & borders match Codeforces native page exactly
    ================================================================ */
 
-/* ----------------------------------------------------------------
+/* ================================================================
    WIDGET CONTAINER
-   The outermost wrapper injected into #pageContent.
-   Mimics the visual weight of a native Codeforces .roundbox.
----------------------------------------------------------------- */
+================================================================ */
 .cfmatrix-widget {
   display: block;
   font-family: verdana, arial, sans-serif;
@@ -27,12 +20,9 @@
   overflow: visible;
 }
 
-/* ----------------------------------------------------------------
-   WIDGET HEADER STRIP
-   Matches the visual style of "Rating-Based Heatmap" and
-   "Problem Ratings" panels that appear below on the same page.
-   Layout: title on left, [legend + 🔄] group pinned to the right.
----------------------------------------------------------------- */
+/* ================================================================
+   HEADER BAR
+================================================================ */
 .cfmatrix-header-bar {
   display: flex;
   align-items: center;
@@ -43,7 +33,6 @@
   border-radius: 2px 2px 0 0;
 }
 
-/* Title — same weight & size as the other extension headings on the page */
 .cfmatrix-title {
   font-family: verdana, arial, sans-serif;
   font-size: 15px;
@@ -52,7 +41,6 @@
   letter-spacing: 0;
 }
 
-/* Right-side wrapper: legend + reset emoji, always flush to the right */
 .cfmatrix-header-right {
   display: flex;
   align-items: center;
@@ -60,7 +48,6 @@
   flex-shrink: 0;
 }
 
-/* Emoji-only reset button — top-right of the header bar */
 .cfmatrix-reset-btn {
   font-size: 15px;
   line-height: 1;
@@ -75,20 +62,12 @@
   user-select: none;
   opacity: 0.7;
 }
+.cfmatrix-reset-btn:hover  { background-color: rgba(0,0,0,0.08); opacity: 1; transform: rotate(30deg); }
+.cfmatrix-reset-btn:active { transform: rotate(180deg); }
 
-.cfmatrix-reset-btn:hover {
-  background-color: rgba(0, 0, 0, 0.08);
-  opacity: 1;
-  transform: rotate(30deg);
-}
-
-.cfmatrix-reset-btn:active {
-  transform: rotate(180deg);
-}
-
-/* ----------------------------------------------------------------
+/* ================================================================
    LOADING STATE
----------------------------------------------------------------- */
+================================================================ */
 .cfmatrix-loading {
   display: flex;
   align-items: center;
@@ -108,14 +87,16 @@
   flex-shrink: 0;
 }
 
-@keyframes cfmatrix-spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes cfmatrix-spin { to { transform: rotate(360deg); } }
 
-/* ----------------------------------------------------------------
-   ERROR STATE
----------------------------------------------------------------- */
+/* ================================================================
+   ERROR STATE  (Gap 1 — includes Retry button)
+================================================================ */
 .cfmatrix-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
   padding: 12px 14px;
   margin: 10px;
   background-color: #fff5f5;
@@ -123,6 +104,33 @@
   border-radius: 3px;
   color: #c0392b;
   font-size: 13px;
+}
+
+/* ================================================================
+   INFO BANNER  (Gap 2 — paginated fetch notice)
+================================================================ */
+.cfmatrix-info-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background-color: #f0f6ff;
+  border-bottom: 1px solid #c8ddf5;
+  font-size: 12px;
+  color: #2c5f9e;
+}
+
+/* ================================================================
+   EMPTY PLACEHOLDER  (Bug fix — zero topics selected)
+================================================================ */
+.cfmatrix-empty-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 20px;
+  color: #999999;
+  font-size: 13px;
+  font-style: italic;
 }
 
 /* ================================================================
@@ -140,7 +148,6 @@
   justify-content: space-between;
 }
 
-/* Left controls group — topic + rating stay together */
 .cfmatrix-control-left {
   display: flex;
   align-items: center;
@@ -148,7 +155,6 @@
   flex-wrap: wrap;
 }
 
-/* Right group — legend pinned to far right */
 .cfmatrix-control-right {
   display: flex;
   align-items: center;
@@ -158,9 +164,7 @@
 }
 
 /* ---- Topic Dropdown ---- */
-.cfmatrix-dropdown-wrap {
-  position: relative;
-}
+.cfmatrix-dropdown-wrap { position: relative; }
 
 .cfmatrix-dropdown-btn {
   font-family: verdana, arial, sans-serif;
@@ -176,11 +180,10 @@
   white-space: nowrap;
   transition: background-color 0.1s, border-color 0.1s, box-shadow 0.1s;
 }
-
 .cfmatrix-dropdown-btn:hover {
   background-color: #f0f4ff;
   border-color: #7aace8;
-  box-shadow: 0 0 0 2px rgba(122, 172, 232, 0.18);
+  box-shadow: 0 0 0 2px rgba(122,172,232,0.18);
 }
 
 .cfmatrix-dropdown-list {
@@ -208,20 +211,14 @@
   border-radius: 2px;
   box-sizing: border-box;
   outline: none;
+  background-color: #ffffff;
 }
+.cfmatrix-dropdown-search:focus { border-color: #6699cc; }
 
-.cfmatrix-dropdown-search:focus {
-  border-color: #6699cc;
-}
-
-.cfmatrix-dropdown-items {
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-.cfmatrix-dropdown-items::-webkit-scrollbar { width: 5px; }
-.cfmatrix-dropdown-items::-webkit-scrollbar-track { background: #f4f4f4; }
-.cfmatrix-dropdown-items::-webkit-scrollbar-thumb { background: #cccccc; border-radius: 3px; }
+.cfmatrix-dropdown-items { max-height: 260px; overflow-y: auto; }
+.cfmatrix-dropdown-items::-webkit-scrollbar        { width: 5px; }
+.cfmatrix-dropdown-items::-webkit-scrollbar-track  { background: #f4f4f4; }
+.cfmatrix-dropdown-items::-webkit-scrollbar-thumb  { background: #cccccc; border-radius: 3px; }
 .cfmatrix-dropdown-items::-webkit-scrollbar-thumb:hover { background: #aaaaaa; }
 
 .cfmatrix-dropdown-item {
@@ -236,24 +233,13 @@
   user-select: none;
   transition: background-color 0.08s;
 }
-
-.cfmatrix-dropdown-item:hover {
-  background-color: #edf2fb;
-}
-
+.cfmatrix-dropdown-item:hover { background-color: #edf2fb; }
 .cfmatrix-dropdown-item input[type="checkbox"] {
-  margin: 0;
-  cursor: pointer;
-  accent-color: #31599a;
-  flex-shrink: 0;
+  margin: 0; cursor: pointer; accent-color: #31599a; flex-shrink: 0;
 }
 
 /* ---- Rating Shifter ---- */
-.cfmatrix-rating-wrap {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
+.cfmatrix-rating-wrap { display: flex; align-items: center; gap: 5px; }
 
 .cfmatrix-shift-btn {
   font-family: verdana, arial, sans-serif;
@@ -268,15 +254,8 @@
   transition: background-color 0.1s, border-color 0.1s;
   user-select: none;
 }
-
-.cfmatrix-shift-btn:hover {
-  background-color: #ddeeff;
-  border-color: #6699cc;
-}
-
-.cfmatrix-shift-btn:active {
-  background-color: #c5daf5;
-}
+.cfmatrix-shift-btn:hover  { background-color: #ddeeff; border-color: #6699cc; }
+.cfmatrix-shift-btn:active { background-color: #c5daf5; }
 
 .cfmatrix-rating-label {
   font-family: verdana, arial, sans-serif;
@@ -288,9 +267,7 @@
   white-space: nowrap;
 }
 
-/* (reset button styles are defined in the header bar section above) */
-
-/* ---- Legend (lives in .cfmatrix-control-right, far right of control bar) ---- */
+/* ---- Legend ---- */
 .cfmatrix-legend {
   display: flex;
   align-items: center;
@@ -303,7 +280,6 @@
   border-left: 1px solid #d0d0d0;
 }
 
-/* Legend squares match the 16×16 matrix cell squares exactly */
 .cfmatrix-legend-sq {
   display: inline-block;
   width: 13px;
@@ -312,19 +288,17 @@
   flex-shrink: 0;
   vertical-align: middle;
 }
-
 .cfmatrix-legend-solved    { background-color: rgba(0,   168, 67,  0.80); }
 .cfmatrix-legend-attempted { background-color: rgba(255, 133, 27,  0.80); }
 
 /* ================================================================
-   TABLE WRAPPER — horizontal scroll for narrow viewports
+   TABLE WRAPPER
 ================================================================ */
 .cfmatrix-table-wrap {
   overflow-x: auto;
-  overflow-y: visible;        /* rows expand downward freely */
+  overflow-y: visible;
   background-color: #ffffff;
 }
-
 .cfmatrix-table-wrap::-webkit-scrollbar        { height: 5px; }
 .cfmatrix-table-wrap::-webkit-scrollbar-track  { background: #f4f4f4; }
 .cfmatrix-table-wrap::-webkit-scrollbar-thumb  { background: #cccccc; border-radius: 3px; }
@@ -343,20 +317,18 @@
   background-color: #ffffff;
 }
 
-/* ---- Column headers ---- */
 .cfmatrix-th {
   font-family: verdana, arial, sans-serif;
   font-size: 12px;
   font-weight: bold;
   color: #444444;
   background-color: #f4f4f4;
-  border: 1px solid #b9b9b9;  /* outer table border weight for header */
+  border: 1px solid #b9b9b9;
   padding: 6px 10px;
   text-align: center;
   white-space: nowrap;
   user-select: none;
 }
-
 .cfmatrix-corner-th {
   text-align: left;
   min-width: 145px;
@@ -364,27 +336,14 @@
   font-size: 11px;
   color: #666666;
 }
+.cfmatrix-rating-th { min-width: 80px; }
 
-.cfmatrix-rating-th {
-  min-width: 80px;
-}
+.cfmatrix-row:nth-child(even) .cfmatrix-td { background-color: #fafafa; }
+.cfmatrix-row .cfmatrix-td { transition: background-color 0.08s ease; }
+.cfmatrix-row:hover  .cfmatrix-td { background-color: #eef4ff; }
 
-/* ---- Row alternating background ---- */
-.cfmatrix-row:nth-child(even) .cfmatrix-td {
-  background-color: #fafafa;
-}
-
-.cfmatrix-row .cfmatrix-td {
-  transition: background-color 0.08s ease;
-}
-
-.cfmatrix-row:hover .cfmatrix-td {
-  background-color: #eef4ff;
-}
-
-/* ---- Generic cell ---- */
 .cfmatrix-td {
-  border: 1px solid #e1e1e1;   /* light inner dividers */
+  border: 1px solid #e1e1e1;
   vertical-align: middle;
   background-color: #ffffff;
   font-family: verdana, arial, sans-serif;
@@ -392,49 +351,37 @@
   color: #333333;
 }
 
-/* ---- Topic label cell ---- */
 .cfmatrix-topic-td {
   padding: 6px 10px;
   font-size: 12px;
   font-weight: bold;
   white-space: nowrap;
-  border-right: 1px solid #b9b9b9;  /* heavier separator between label & data */
+  border-right: 1px solid #b9b9b9;
   min-width: 145px;
 }
 
-/* ---- Data cell: padding creates the white breathing gap ---- */
-.cfmatrix-data-td {
-  padding: 6px;               /* 6px on all 4 sides — req. §3 */
-  text-align: center;
-}
+.cfmatrix-data-td  { padding: 6px; text-align: center; }
 
-/* ---- Cell flex row holding the two squares ---- */
 .cfmatrix-cell-flex {
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 3px;                   /* 3px horizontal gap between squares — req. §3 */
+  gap: 3px;
 }
 
 /* ================================================================
-   COLOUR SQUARES  (16 × 16 px, sharp corners, no border-radius)
+   COLOUR SQUARES
 ================================================================ */
 .cfmatrix-sq {
   display: inline-block;
-  width: 16px;                /* exact square — req. §3 */
-  height: 16px;               /* exact square — req. §3 */
-  border-radius: 0;           /* completely sharp corners — req. §3 */
+  width: 16px;
+  height: 16px;
+  border-radius: 0;
   flex-shrink: 0;
   transition: opacity 0.12s ease;
 }
-
-/* Hover: subtle lift on active squares */
-.cfmatrix-sq:not(.cfmatrix-sq-inactive):hover {
-  opacity: 0.82;
-}
-
-/* Inactive / zero-data: flat muted grey, pointer-events off */
+.cfmatrix-sq:not(.cfmatrix-sq-inactive):hover { opacity: 0.82; }
 .cfmatrix-sq-inactive {
   background-color: #f4f4f4 !important;
   cursor: default !important;
@@ -442,41 +389,23 @@
 }
 
 /* ================================================================
-   OVERLAY CARD (problem list)
-   FIX: strict height bottleneck, wrapping links, clean scrollbar
+   OVERLAY CARD
 ================================================================ */
+.cfmatrix-overlay-tr { background-color: transparent !important; }
+.cfmatrix-overlay-tr:hover .cfmatrix-overlay-td { background-color: transparent !important; }
+.cfmatrix-overlay-td { padding: 0 !important; border: none !important; background-color: transparent !important; }
 
-/* The overlay <tr> and its <td> wrapper must be fully transparent */
-.cfmatrix-overlay-tr {
-  background-color: transparent !important;
-}
-
-.cfmatrix-overlay-tr:hover .cfmatrix-overlay-td {
-  background-color: transparent !important;
-}
-
-.cfmatrix-overlay-td {
-  padding: 0 !important;
-  border: none !important;
-  background-color: transparent !important;
-}
-
-/* ---- Outer card shell ----
-   overflow: hidden clips the animation; the scrollable region is
-   entirely inside .cfmatrix-overlay-list, not the card itself,
-   so the card's height is determined by its children naturally.
-   box-sizing: border-box ensures margin / border don't expand it. */
 .cfmatrix-overlay-card {
   box-sizing: border-box;
-  max-height: 200px;           /* hard ceiling — req. §1 */
+  max-height: 200px;
   display: flex;
-  flex-direction: column;      /* header stays pinned, list scrolls */
+  flex-direction: column;
   margin: 3px 8px 8px 8px;
   background-color: #ffffff;
   border: 1px solid #b9b9b9;
   border-radius: 3px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.10);
-  overflow: hidden;            /* clips border-radius on children */
+  box-shadow: 0 4px 14px rgba(0,0,0,0.10);
+  overflow: hidden;
   font-family: verdana, arial, sans-serif;
   font-size: 12px;
   animation: cfmatrix-fadein 0.14s ease;
@@ -487,10 +416,9 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ---- Pinned header strip (never scrolls) ---- */
 .cfmatrix-overlay-header {
   box-sizing: border-box;
-  flex-shrink: 0;              /* never squashed by list growth */
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -504,7 +432,6 @@
   flex-grow: 1;
   font-size: 11px;
   color: #666666;
-  /* allow long tag names to wrap rather than push the close button off */
   white-space: normal;
   word-break: break-word;
 }
@@ -521,101 +448,186 @@
   padding: 1px 5px;
   transition: background-color 0.1s, border-color 0.1s, color 0.1s;
 }
-
 .cfmatrix-overlay-close:hover {
   background-color: #fde8e8;
   border-color: #d09090;
   color: #c0392b;
 }
 
-/* ---- Scrollable links region ----
-   This element is the ONLY scroll container.
-   overflow-y: auto  → vertical scrollbar appears only when needed
-   overflow-x: hidden → prevents horizontal bleed / sideways scroll
-   padding-right: 12px → keeps text clear of the scrollbar thumb     */
 .cfmatrix-overlay-list {
-  box-sizing: border-box;      /* req. §1 — padding included in height */
-  flex: 1 1 auto;              /* take remaining height inside the card */
-  overflow-y: auto;            /* req. §1 */
-  overflow-x: hidden;          /* req. §1 */
-  padding: 6px 12px 6px 10px; /* right=12px guards against scrollbar overlap — req. §3 */
-  /* flex-direction / gap replaced by per-link margin for wrapping support */
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 12px 6px 10px;
 }
+.cfmatrix-overlay-list::-webkit-scrollbar        { width: 6px; }
+.cfmatrix-overlay-list::-webkit-scrollbar-track  { background: #f1f1f1; border-radius: 3px; }
+.cfmatrix-overlay-list::-webkit-scrollbar-thumb  { background: #c1c1c1; border-radius: 3px; }
+.cfmatrix-overlay-list::-webkit-scrollbar-thumb:hover { background: #999999; }
 
-/* ---- Custom scrollbar — thin, neutral, CF-palette ---- */
-.cfmatrix-overlay-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.cfmatrix-overlay-list::-webkit-scrollbar-track {
-  background: #f1f1f1;         /* req. §3 — light grey track */
-  border-radius: 3px;
-}
-
-.cfmatrix-overlay-list::-webkit-scrollbar-thumb {
-  background: #c1c1c1;         /* req. §3 — medium grey thumb */
-  border-radius: 3px;
-}
-
-.cfmatrix-overlay-list::-webkit-scrollbar-thumb:hover {
-  background: #999999;
-}
-
-/* ---- Individual problem link ----
-   display: block + width: 100% → fills the list width
-   white-space: normal + word-break: break-word → long names wrap cleanly
-   margin-bottom: 6px → comfortable breathing room between entries      */
 .cfmatrix-prob-link {
-  display: block;              /* req. §2 */
-  width: 100%;                 /* req. §2 */
-  box-sizing: border-box;      /* req. §1 */
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   font-family: verdana, arial, sans-serif;
   font-size: 12px;
-  color: #31599a;              /* CF blue — req. §4 */
+  color: #31599a;
   text-decoration: none;
-  padding: 4px 0;              /* req. §2 — vertical breathing room */
-  margin-bottom: 6px;         /* req. §2 — spacing between links */
-  white-space: normal;         /* req. §2 — allow wrapping */
-  word-break: break-word;      /* req. §2 — break very long names */
-  overflow: visible;           /* no clipping — text must wrap, not clip */
+  padding: 4px 0;
+  margin-bottom: 6px;
+  white-space: normal;
+  word-break: break-word;
+  overflow: visible;
   line-height: 1.45;
   transition: color 0.1s;
 }
-
-/* Remove the trailing margin on the last link so the list
-   doesn't have unnecessary extra space at the bottom */
-.cfmatrix-prob-link:last-child {
-  margin-bottom: 0;
-}
-
-.cfmatrix-prob-link:hover {
-  text-decoration: underline;  /* req. §4 */
-  color: #1a3a6a;
-}
+.cfmatrix-prob-link:last-child { margin-bottom: 0; }
+.cfmatrix-prob-link:hover { text-decoration: underline; color: #1a3a6a; }
 
 .cfmatrix-prob-rating {
   display: inline;
   font-size: 11px;
   color: #888888;
   font-weight: normal;
-  white-space: nowrap;         /* rating badge stays on one token */
+  white-space: nowrap;
 }
 
 /* ================================================================
-   RESPONSIVE ADJUSTMENTS
+   RESPONSIVE
 ================================================================ */
 @media (max-width: 800px) {
-  .cfmatrix-control-bar {
-    gap: 7px;
-    padding: 7px 8px;
-  }
+  .cfmatrix-control-bar  { gap: 7px; padding: 7px 8px; }
   .cfmatrix-corner-th,
-  .cfmatrix-topic-td {
-    min-width: 110px;
-    font-size: 11px;
-  }
-  .cfmatrix-rating-th {
-    min-width: 66px;
-    font-size: 11px;
-  }
+  .cfmatrix-topic-td     { min-width: 110px; font-size: 11px; }
+  .cfmatrix-rating-th    { min-width: 66px;  font-size: 11px; }
 }
+
+/* ================================================================
+   GAP 3 — DARK MODE
+   Keyed ONLY off Codeforces' own body class, NOT the OS media query.
+   CF sets body.dark (or body[data-theme="dark"]) when the user clicks
+   the moon icon in their navbar — completely independent of the OS
+   preference. Using @media (prefers-color-scheme: dark) would fire
+   for users who have OS dark mode but CF in light mode, which is the
+   exact bug reported. We intentionally omit the media query here.
+================================================================ */
+
+/* Codeforces' own dark-mode body class */
+body.dark .cfmatrix-widget,
+body[data-theme="dark"] .cfmatrix-widget {
+  background-color: #1e1e1e;
+  border-color: #3a3a3a;
+  color: #d4d4d4;
+}
+
+body.dark .cfmatrix-header-bar,
+body[data-theme="dark"] .cfmatrix-header-bar {
+  background: linear-gradient(to bottom, #2a2a2a 0%, #242424 100%);
+  border-bottom-color: #3a3a3a;
+}
+
+body.dark .cfmatrix-title,
+body[data-theme="dark"] .cfmatrix-title { color: #e8e8e8; }
+
+body.dark .cfmatrix-reset-btn:hover,
+body[data-theme="dark"] .cfmatrix-reset-btn:hover { background-color: rgba(255,255,255,0.10); }
+
+body.dark .cfmatrix-loading,
+body[data-theme="dark"] .cfmatrix-loading { color: #888888; }
+
+body.dark .cfmatrix-spinner,
+body[data-theme="dark"] .cfmatrix-spinner { border-color: #444444; border-top-color: #888888; }
+
+body.dark .cfmatrix-error,
+body[data-theme="dark"] .cfmatrix-error { background-color: #2d1a1a; border-color: #6b3030; color: #e07070; }
+
+body.dark .cfmatrix-info-banner,
+body[data-theme="dark"] .cfmatrix-info-banner { background-color: #1a2535; border-bottom-color: #2c4a70; color: #7aace8; }
+
+body.dark .cfmatrix-empty-placeholder,
+body[data-theme="dark"] .cfmatrix-empty-placeholder { color: #666666; }
+
+body.dark .cfmatrix-control-bar,
+body[data-theme="dark"] .cfmatrix-control-bar { background-color: #252525; border-bottom-color: #333333; }
+
+body.dark .cfmatrix-dropdown-btn,
+body[data-theme="dark"] .cfmatrix-dropdown-btn { background-color: #2c2c2c; border-color: #4a4a4a; color: #d4d4d4; }
+
+body.dark .cfmatrix-dropdown-btn:hover,
+body[data-theme="dark"] .cfmatrix-dropdown-btn:hover { background-color: #1e2d42; border-color: #5580b0; }
+
+body.dark .cfmatrix-dropdown-list,
+body[data-theme="dark"] .cfmatrix-dropdown-list { background-color: #252525; border-color: #3a3a3a; box-shadow: 0 4px 10px rgba(0,0,0,0.40); }
+
+body.dark .cfmatrix-dropdown-search,
+body[data-theme="dark"] .cfmatrix-dropdown-search { background-color: #1e1e1e; border-color: #4a4a4a; color: #d4d4d4; }
+
+body.dark .cfmatrix-dropdown-item,
+body[data-theme="dark"] .cfmatrix-dropdown-item { color: #d4d4d4; }
+
+body.dark .cfmatrix-dropdown-item:hover,
+body[data-theme="dark"] .cfmatrix-dropdown-item:hover { background-color: #1e2d42; }
+
+body.dark .cfmatrix-shift-btn,
+body[data-theme="dark"] .cfmatrix-shift-btn { background-color: #2c2c2c; border-color: #4a4a4a; color: #d4d4d4; }
+
+body.dark .cfmatrix-shift-btn:hover,
+body[data-theme="dark"] .cfmatrix-shift-btn:hover { background-color: #1e2d42; border-color: #5580b0; }
+
+body.dark .cfmatrix-rating-label,
+body[data-theme="dark"] .cfmatrix-rating-label { color: #d4d4d4; }
+
+body.dark .cfmatrix-legend,
+body[data-theme="dark"] .cfmatrix-legend { color: #888888; border-left-color: #3a3a3a; }
+
+body.dark .cfmatrix-table-wrap,
+body[data-theme="dark"] .cfmatrix-table-wrap { background-color: #1e1e1e; }
+
+body.dark .cfmatrix-table,
+body[data-theme="dark"] .cfmatrix-table { background-color: #1e1e1e; color: #d4d4d4; }
+
+body.dark .cfmatrix-th,
+body[data-theme="dark"] .cfmatrix-th { background-color: #2a2a2a; border-color: #3a3a3a; color: #bbbbbb; }
+
+body.dark .cfmatrix-corner-th,
+body[data-theme="dark"] .cfmatrix-corner-th { background-color: #252525; color: #888888; }
+
+body.dark .cfmatrix-row:nth-child(even) .cfmatrix-td,
+body[data-theme="dark"] .cfmatrix-row:nth-child(even) .cfmatrix-td { background-color: #222222; }
+
+body.dark .cfmatrix-row:hover .cfmatrix-td,
+body[data-theme="dark"] .cfmatrix-row:hover .cfmatrix-td { background-color: #1a2535; }
+
+body.dark .cfmatrix-td,
+body[data-theme="dark"] .cfmatrix-td { border-color: #2e2e2e; background-color: #1e1e1e; color: #d4d4d4; }
+
+body.dark .cfmatrix-topic-td,
+body[data-theme="dark"] .cfmatrix-topic-td { border-right-color: #3a3a3a; }
+
+body.dark .cfmatrix-sq-inactive,
+body[data-theme="dark"] .cfmatrix-sq-inactive { background-color: #2e2e2e !important; }
+
+body.dark .cfmatrix-overlay-card,
+body[data-theme="dark"] .cfmatrix-overlay-card { background-color: #252525; border-color: #3a3a3a; box-shadow: 0 4px 14px rgba(0,0,0,0.40); }
+
+body.dark .cfmatrix-overlay-header,
+body[data-theme="dark"] .cfmatrix-overlay-header { background-color: #2a2a2a; border-bottom-color: #333333; }
+
+body.dark .cfmatrix-overlay-subtitle,
+body[data-theme="dark"] .cfmatrix-overlay-subtitle { color: #888888; }
+
+body.dark .cfmatrix-overlay-close,
+body[data-theme="dark"] .cfmatrix-overlay-close { color: #666666; }
+
+body.dark .cfmatrix-overlay-close:hover,
+body[data-theme="dark"] .cfmatrix-overlay-close:hover { background-color: #3d1f1f; border-color: #7a4040; color: #e07070; }
+
+body.dark .cfmatrix-prob-link,
+body[data-theme="dark"] .cfmatrix-prob-link { color: #6699cc; }
+
+body.dark .cfmatrix-prob-link:hover,
+body[data-theme="dark"] .cfmatrix-prob-link:hover { color: #88bbee; }
+
+body.dark .cfmatrix-prob-rating,
+body[data-theme="dark"] .cfmatrix-prob-rating { color: #666666; }
