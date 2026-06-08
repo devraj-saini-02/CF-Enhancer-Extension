@@ -1,14 +1,6 @@
 /**
- * Codeforces Matrix Analyzer — content.js  v2.0
+ * Codeforces Problem Tracker — content.js  v3.0
  * Manifest V3 · Vanilla JS · Zero dependencies
- *
- * Key architecture changes from v1:
- *  - NO navigation tab. Widget is injected automatically into #pageContent
- *    below the profile header / activity calendar on page load.
- *  - Unlimited topic rows (no cap).
- *  - Color blocks are strict 16×16 squares (border-radius: 0).
- *  - Permanent chrome.storage.local persistence per handle.
- *  - Reset is the ONLY way to return to baseline defaults.
  */
 
 (() => {
@@ -28,7 +20,9 @@
   const CF_ORANGE      = '255, 133, 27';
   const STORAGE_PREFIX = 'cfmatrix_v2_';
 
-  /** Human-readable labels for every known CF tag */
+  // CF API paginates at 10 000; we fetch in chunks to get everything
+  const API_PAGE_SIZE  = 10000;
+
   const TAG_LABELS = {
     'greedy'                   : 'Greedy',
     'math'                     : 'Math',
@@ -69,10 +63,11 @@
     'dsu'                      : 'DSU'
   };
 
+  const WIDGET_TITLE = 'Problem Tracker';
+
   /* ================================================================
      UTILITIES
   ================================================================ */
-  /** Extract CF handle from /profile/<handle> */
   function getHandle() {
     const parts = window.location.pathname.split('/');
     return parts[2] ? decodeURIComponent(parts[2]) : null;
@@ -83,24 +78,16 @@
   }
 
   function tagLabel(tag) {
-    return TAG_LABELS[tag]
-      || tag.replace(/\b\w/g, c => c.toUpperCase());
+    return TAG_LABELS[tag] || tag.replace(/\b\w/g, c => c.toUpperCase());
   }
 
-  /**
-   * Scrape the user's contest rating from the profile DOM.
-   * Codeforces renders it inside `.info ul li` as "Contest rating: 1542"
-   * or inside a coloured <span> in .userbox.
-   */
   function getRatingFromDOM() {
-    // Strategy 1: structured list item
     for (const li of document.querySelectorAll('.info ul li')) {
       if (/contest rating/i.test(li.textContent)) {
         const m = li.textContent.match(/\b(\d{3,4})\b/);
         if (m) return parseInt(m[1], 10);
       }
     }
-    // Strategy 2: coloured rating span (Codeforces adds class like "user-red")
     for (const span of document.querySelectorAll('.userbox span[class], .info span[class]')) {
       const m = span.textContent.match(/\b(\d{3,4})\b/);
       if (m) {
@@ -108,7 +95,6 @@
         if (n >= 800 && n <= 4000) return n;
       }
     }
-    // Strategy 3: any bold number in the info block
     for (const b of document.querySelectorAll('.info b, .userbox b')) {
       const n = parseInt(b.textContent.trim(), 10);
       if (n >= 800 && n <= 4000) return n;
@@ -116,55 +102,82 @@
     return null;
   }
 
-  /**
-   * Build an array of COLUMN_WINDOW consecutive 100-point rating bands
-   * centred roughly around the user's current rating.
-   * e.g. rating=972  → [800, 900, 1000, 1100, 1200, 1300]
-   *      rating=3400 → [3000,3100,3200,3300,3400,3500]
-   */
   function buildRatingWindow(userRating) {
     if (!userRating || userRating < 800) userRating = 800;
-    // Lower bound = floor to nearest 100, then step back 2 columns so the
-    // user's band sits roughly in the middle of the 6-column window.
     const floorHundred = Math.floor(userRating / 100) * 100;
     const start = Math.max(800, floorHundred - 200);
     return Array.from({ length: COLUMN_WINDOW }, (_, i) => start + i * RATING_STEP);
   }
 
+  /** sleep helper for backoff */
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  /* ================================================================
+     GAP 1 — FETCH WITH EXPONENTIAL-BACKOFF RETRY
+     3 attempts: immediate → 1 s delay → 3 s delay
+     Error message is returned as a plain string, never injected as HTML.
+  ================================================================ */
+  async function fetchWithRetry(url, maxAttempts = 3) {
+    let lastErr;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) await sleep(attempt === 1 ? 1000 : 3000);
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const json = await resp.json();
+        if (json.status !== 'OK') {
+          // comment field is plain text from CF — we store it but NEVER innerHTML it
+          throw new Error(json.comment || 'CF API returned non-OK');
+        }
+        return json.result;
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr;
+  }
+
+  /* ================================================================
+     GAP 2 — PAGINATED FETCH (bypasses the 10 000 submission cap)
+     Fetches pages of API_PAGE_SIZE until a page comes back smaller,
+     meaning we've reached the end.
+     Returns { submissions: [], wasPaginated: boolean }
+  ================================================================ */
+  async function fetchSubmissions(handle) {
+    const all = [];
+    let from = 1;
+    let wasPaginated = false;
+
+    while (true) {
+      const url =
+        `https://codeforces.com/api/user.status` +
+        `?handle=${encodeURIComponent(handle)}` +
+        `&from=${from}&count=${API_PAGE_SIZE}`;
+
+      const page = await fetchWithRetry(url);
+
+      all.push(...page);
+
+      if (page.length < API_PAGE_SIZE) break; // last page — done
+
+      // We got a full page; there may be more
+      wasPaginated = true;
+      from += API_PAGE_SIZE;
+    }
+
+    return { submissions: all, wasPaginated };
+  }
+
   /* ================================================================
      DATA ENGINE
   ================================================================ */
-  async function fetchSubmissions(handle) {
-    const url = `https://codeforces.com/api/user.status?handle=${encodeURIComponent(handle)}`;
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`API HTTP ${resp.status}`);
-    const json = await resp.json();
-    if (json.status !== 'OK') throw new Error(json.comment || 'CF API returned non-OK');
-    return json.result; // raw submission array
-  }
-
-  /**
-   * Parse raw CF submissions into the cell map.
-   *
-   * Deduplication rule:
-   *   - Key = contestId + "_" + problemIndex  (one entry per unique problem)
-   *   - If ANY submission for that key has verdict "OK" → Solved
-   *   - Else → Attempted
-   *
-   * Returns:
-   *   cellMap    : Map<"tag|band", { solvedProblems[], attemptedProblems[] }>
-   *   sortedTags : string[] — all tags sorted by total solves descending
-   *   maxRating  : number   — highest rated band seen in data
-   */
   function parseSubmissions(submissions) {
-    /* Step 1 — deduplicate by problem key */
-    const problemMap = new Map(); // key → entry
+    const problemMap = new Map();
 
     for (const sub of submissions) {
       const prob = sub.problem;
       if (!prob) continue;
-
-      const key = `${sub.contestId || prob.contestId || 0}_${prob.index}`;
+      const key  = `${sub.contestId || prob.contestId || 0}_${prob.index}`;
       const isOK = sub.verdict === 'OK';
 
       if (!problemMap.has(key)) {
@@ -177,14 +190,13 @@
           name      : prob.name
         });
       } else if (isOK) {
-        problemMap.get(key).verdict = 'OK'; // upgrade to solved
+        problemMap.get(key).verdict = 'OK';
       }
     }
 
-    /* Step 2 — build cell map */
-    const cellMap        = new Map();
-    const tagSolveCount  = new Map();
-    let   maxRating      = 0;
+    const cellMap       = new Map();
+    const tagSolveCount = new Map();
+    let   maxRating     = 0;
 
     for (const entry of problemMap.values()) {
       if (!entry.rating) continue;
@@ -215,7 +227,6 @@
       }
     }
 
-    /* Step 3 — sort tags */
     const sortedTags = [...tagSolveCount.entries()]
       .sort((a, b) => b[1] - a[1])
       .map(([tag]) => tag);
@@ -224,7 +235,7 @@
   }
 
   /* ================================================================
-     STORAGE HELPERS
+     STORAGE
   ================================================================ */
   function loadState(handle) {
     return new Promise(resolve => {
@@ -243,23 +254,12 @@
   }
 
   /* ================================================================
-     DOM INJECTION — auto-place widget below profile header
+     DOM INJECTION
   ================================================================ */
-  /**
-   * Find the best insertion anchor inside #pageContent and return the
-   * element after which the widget should be inserted.
-   *
-   * Codeforces profile page structure (approximate):
-   *   #pageContent
-   *     .userbox / .roundbox  ← profile header card
-   *     div (activity/calendar strip)
-   *     ...rest of page
-   */
   function findInsertionAnchor() {
     const pageContent = document.getElementById('pageContent');
     if (!pageContent) return null;
 
-    // Prefer the user activity / heatmap block that appears just below header
     const candidates = [
       pageContent.querySelector('._UserActivityGraph'),
       pageContent.querySelector('[class*="activity"]'),
@@ -272,8 +272,6 @@
     for (const el of candidates) {
       if (el && el.parentNode === pageContent) return el;
     }
-
-    // Fallback: last child of pageContent
     return pageContent.lastElementChild || null;
   }
 
@@ -281,56 +279,68 @@
     if (document.getElementById('cfmatrix-widget')) {
       return document.getElementById('cfmatrix-widget');
     }
-
     const widget = document.createElement('div');
-    widget.id = 'cfmatrix-widget';
+    widget.id        = 'cfmatrix-widget';
     widget.className = 'cfmatrix-widget';
 
     const anchor = findInsertionAnchor();
     if (anchor && anchor.parentNode) {
       anchor.parentNode.insertBefore(widget, anchor.nextSibling);
     } else {
-      // Absolute fallback: append to #pageContent or body
-      const pc = document.getElementById('pageContent') || document.body;
-      pc.appendChild(widget);
+      (document.getElementById('pageContent') || document.body).appendChild(widget);
     }
-
     return widget;
   }
 
   /* ================================================================
      LOADING / ERROR STATES
+     GAP 1 fix: error text set via textContent, never innerHTML,
+     so a malicious CF API comment cannot inject script.
   ================================================================ */
-  function renderLoading(widget) {
-    widget.innerHTML = `
-      <div class="cfmatrix-header-bar">
-        <span class="cfmatrix-title">Matrix Analysis</span>
-      </div>
-      <div class="cfmatrix-loading">
-        <div class="cfmatrix-spinner"></div>
-        <span>Loading submission data…</span>
-      </div>`;
+  function makeHeaderBar() {
+    const bar = document.createElement('div');
+    bar.className = 'cfmatrix-header-bar';
+    const t = document.createElement('span');
+    t.className   = 'cfmatrix-title';
+    t.textContent = WIDGET_TITLE;
+    bar.appendChild(t);
+    return bar;
   }
 
-  function renderError(widget, msg) {
-    widget.innerHTML = `
-      <div class="cfmatrix-header-bar">
-        <span class="cfmatrix-title">Matrix Analysis</span>
-      </div>
-      <div class="cfmatrix-error">
-        <strong>Matrix Analysis — fetch error:</strong> ${msg}
-      </div>`;
+  function renderLoading(widget) {
+    widget.innerHTML = '';
+    widget.appendChild(makeHeaderBar());
+    const wrap = document.createElement('div');
+    wrap.className = 'cfmatrix-loading';
+    const spinner = document.createElement('div');
+    spinner.className = 'cfmatrix-spinner';
+    const txt = document.createElement('span');
+    txt.textContent = 'Loading submission data…';
+    wrap.appendChild(spinner);
+    wrap.appendChild(txt);
+    widget.appendChild(wrap);
+  }
+
+  function renderError(widget, plainMsg) {
+    widget.innerHTML = '';
+    widget.appendChild(makeHeaderBar());
+
+    const box = document.createElement('div');
+    box.className = 'cfmatrix-error';
+
+    const strong = document.createElement('strong');
+    strong.textContent = 'Problem Tracker — could not load data: ';
+    // textContent only — never innerHTML with the API string
+    const msgNode = document.createTextNode(plainMsg);
+
+    box.appendChild(strong);
+    box.appendChild(msgNode);
+    widget.appendChild(box);
   }
 
   /* ================================================================
      CONTROL BAR
   ================================================================ */
-  /**
-   * Builds the control bar and returns { bar, refreshDropdown, refreshRatingLabel, refreshTopicBtn }
-   * so the reset handler can update UI state without a full re-render.
-   *
-   * activeTags  and  activeRatings  are mutated in-place by callbacks.
-   */
   function buildControlBar({ allTags, activeTags, activeRatings, onTagChange, onRatingShift, onReset }) {
     const bar = document.createElement('div');
     bar.className = 'cfmatrix-control-bar';
@@ -340,23 +350,20 @@
     dropWrap.className = 'cfmatrix-dropdown-wrap';
 
     const topicBtn = document.createElement('button');
-    topicBtn.type = 'button';
+    topicBtn.type      = 'button';
     topicBtn.className = 'cfmatrix-dropdown-btn';
 
-    function refreshTopicBtn() {
-      topicBtn.textContent = `Topics ▾`;
-    }
+    function refreshTopicBtn() { topicBtn.textContent = 'Topics ▾'; }
     refreshTopicBtn();
 
     const dropList = document.createElement('div');
-    dropList.className = 'cfmatrix-dropdown-list';
+    dropList.className    = 'cfmatrix-dropdown-list';
     dropList.style.display = 'none';
 
-    /* Search inside dropdown */
     const searchBox = document.createElement('input');
-    searchBox.type = 'text';
+    searchBox.type        = 'text';
     searchBox.placeholder = 'Filter topics…';
-    searchBox.className = 'cfmatrix-dropdown-search';
+    searchBox.className   = 'cfmatrix-dropdown-search';
     searchBox.addEventListener('input', () => {
       const q = searchBox.value.toLowerCase();
       dropList.querySelectorAll('.cfmatrix-dropdown-item').forEach(item => {
@@ -372,15 +379,14 @@
     function refreshDropdown() {
       itemsContainer.innerHTML = '';
       searchBox.value = '';
-      // Show ALL tags (unlimited)
       for (const tag of allTags) {
         const label = document.createElement('label');
-        label.className = 'cfmatrix-dropdown-item';
+        label.className  = 'cfmatrix-dropdown-item';
         label.dataset.tag = tag;
 
         const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.value = tag;
+        cb.type    = 'checkbox';
+        cb.value   = tag;
         cb.checked = activeTags.includes(tag);
 
         cb.addEventListener('change', () => {
@@ -408,40 +414,37 @@
       e.stopPropagation();
       dropList.style.display = dropList.style.display === 'none' ? 'block' : 'none';
     });
-
-    // Close on outside click
     document.addEventListener('click', () => { dropList.style.display = 'none'; });
     dropList.addEventListener('click', e => e.stopPropagation());
 
     dropWrap.appendChild(topicBtn);
     dropWrap.appendChild(dropList);
 
-    /* ---- Rating window shifter ---- */
+    /* ---- Rating shifter ---- */
     const ratingWrap = document.createElement('div');
     ratingWrap.className = 'cfmatrix-rating-wrap';
 
     const btnLeft = document.createElement('button');
-    btnLeft.type = 'button';
+    btnLeft.type      = 'button';
     btnLeft.className = 'cfmatrix-shift-btn';
     btnLeft.textContent = '◀';
-    btnLeft.title = 'Shift window −100';
+    btnLeft.title     = 'Shift window −100';
 
     const ratingLabel = document.createElement('span');
     ratingLabel.className = 'cfmatrix-rating-label';
 
     function refreshRatingLabel() {
       if (activeRatings.length) {
-        ratingLabel.textContent =
-          `${activeRatings[0]} – ${activeRatings[activeRatings.length - 1]}`;
+        ratingLabel.textContent = `${activeRatings[0]} – ${activeRatings[activeRatings.length - 1]}`;
       }
     }
     refreshRatingLabel();
 
     const btnRight = document.createElement('button');
-    btnRight.type = 'button';
-    btnRight.className = 'cfmatrix-shift-btn';
+    btnRight.type       = 'button';
+    btnRight.className  = 'cfmatrix-shift-btn';
     btnRight.textContent = '▶';
-    btnRight.title = 'Shift window +100';
+    btnRight.title      = 'Shift window +100';
 
     btnLeft.addEventListener('click', () => {
       if (activeRatings[0] <= 800) return;
@@ -449,7 +452,6 @@
       refreshRatingLabel();
       onRatingShift();
     });
-
     btnRight.addEventListener('click', () => {
       for (let i = 0; i < activeRatings.length; i++) activeRatings[i] += RATING_STEP;
       refreshRatingLabel();
@@ -460,22 +462,31 @@
     ratingWrap.appendChild(ratingLabel);
     ratingWrap.appendChild(btnRight);
 
-    /* ---- Reset button (emoji only — lives in the header bar, not here) ---- */
+    /* ---- Reset button (goes in header bar, returned separately) ---- */
     const resetBtn = document.createElement('button');
-    resetBtn.type = 'button';
-    resetBtn.className = 'cfmatrix-reset-btn';
+    resetBtn.type       = 'button';
+    resetBtn.className  = 'cfmatrix-reset-btn';
     resetBtn.textContent = '🔄';
-    resetBtn.title = 'Reset Defaults — clear saved state and restore baseline';
+    resetBtn.title      = 'Reset Defaults — clear saved state and restore baseline';
     resetBtn.addEventListener('click', onReset);
 
-    /* ---- Legend (lives in the header bar, not here) ---- */
+    /* ---- Legend (goes in header bar, returned separately) ---- */
     const legend = document.createElement('div');
     legend.className = 'cfmatrix-legend';
-    legend.innerHTML =
-      `<span class="cfmatrix-legend-sq cfmatrix-legend-solved"></span><span>Solved</span>` +
-      `<span class="cfmatrix-legend-sq cfmatrix-legend-attempted"></span><span>Attempted</span>`;
+    const solvedSq = document.createElement('span');
+    solvedSq.className = 'cfmatrix-legend-sq cfmatrix-legend-solved';
+    const solvedTxt = document.createElement('span');
+    solvedTxt.textContent = 'Solved';
+    const attemptedSq = document.createElement('span');
+    attemptedSq.className = 'cfmatrix-legend-sq cfmatrix-legend-attempted';
+    const attemptedTxt = document.createElement('span');
+    attemptedTxt.textContent = 'Attempted';
+    legend.appendChild(solvedSq);
+    legend.appendChild(solvedTxt);
+    legend.appendChild(attemptedSq);
+    legend.appendChild(attemptedTxt);
 
-    /* ---- Legend pinned to far right of control bar ---- */
+    /* ---- Control right group: legend pinned to far right of control bar ---- */
     const controlRight = document.createElement('div');
     controlRight.className = 'cfmatrix-control-right';
     controlRight.appendChild(legend);
@@ -484,7 +495,7 @@
     bar.appendChild(ratingWrap);
     bar.appendChild(controlRight);
 
-    return { bar, resetBtn, legend, refreshDropdown, refreshRatingLabel, refreshTopicBtn };
+    return { bar, resetBtn, refreshDropdown, refreshRatingLabel, refreshTopicBtn };
   }
 
   /* ================================================================
@@ -496,7 +507,7 @@
       for (const rating of activeRatings) {
         const cell = cellMap.get(`${tag}|${rating}`);
         if (!cell) continue;
-        if (cell.solvedProblems.length   > maxSolved)   maxSolved   = cell.solvedProblems.length;
+        if (cell.solvedProblems.length    > maxSolved)    maxSolved    = cell.solvedProblems.length;
         if (cell.attemptedProblems.length > maxAttempted) maxAttempted = cell.attemptedProblems.length;
       }
     }
@@ -511,42 +522,37 @@
     const table = document.createElement('table');
     table.className = 'cfmatrix-table';
 
-    /* ----- THEAD ----- */
     const thead = document.createElement('thead');
     const hRow  = document.createElement('tr');
-
     const cornerTh = document.createElement('th');
-    cornerTh.className = 'cfmatrix-th cfmatrix-corner-th';
+    cornerTh.className   = 'cfmatrix-th cfmatrix-corner-th';
     cornerTh.textContent = 'Topic \\ Rating';
     hRow.appendChild(cornerTh);
 
     for (const r of activeRatings) {
       const th = document.createElement('th');
-      th.className = 'cfmatrix-th cfmatrix-rating-th';
+      th.className   = 'cfmatrix-th cfmatrix-rating-th';
       th.textContent = r;
       hRow.appendChild(th);
     }
     thead.appendChild(hRow);
     table.appendChild(thead);
 
-    /* ----- TBODY ----- */
     const tbody = document.createElement('tbody');
 
     for (const tag of activeTags) {
       const tr = document.createElement('tr');
       tr.className = 'cfmatrix-row';
 
-      /* Topic label */
       const labelTd = document.createElement('td');
-      labelTd.className = 'cfmatrix-td cfmatrix-topic-td';
+      labelTd.className   = 'cfmatrix-td cfmatrix-topic-td';
       labelTd.textContent = tagLabel(tag);
       tr.appendChild(labelTd);
 
-      /* Data cells */
       for (const rating of activeRatings) {
-        const cellKey = `${tag}|${rating}`;
-        const data    = isGhost ? null : cellMap.get(cellKey);
-        const solved    = data ? data.solvedProblems.length   : 0;
+        const cellKey   = `${tag}|${rating}`;
+        const data      = isGhost ? null : cellMap.get(cellKey);
+        const solved    = data ? data.solvedProblems.length    : 0;
         const attempted = data ? data.attemptedProblems.length : 0;
         const hasData   = solved > 0 || attempted > 0;
 
@@ -556,26 +562,21 @@
         const flex = document.createElement('div');
         flex.className = 'cfmatrix-cell-flex';
 
-        /* Solved square */
-        const solvedSq = document.createElement('div');
+        const solvedSq    = document.createElement('div');
         solvedSq.className = 'cfmatrix-sq cfmatrix-sq-solved';
 
-        /* Attempted square */
-        const attemptedSq = document.createElement('div');
+        const attemptedSq    = document.createElement('div');
         attemptedSq.className = 'cfmatrix-sq cfmatrix-sq-attempted';
 
         if (!hasData || isGhost) {
-          /* ---- INACTIVE (zero data) ---- */
           solvedSq.classList.add('cfmatrix-sq-inactive');
           attemptedSq.classList.add('cfmatrix-sq-inactive');
         } else {
-          /* ---- ACTIVE ---- */
-          // Solved square
           if (solved > 0) {
             const alpha = maxSolved > 0 ? Math.max(0.12, solved / maxSolved) : 0.12;
             solvedSq.style.backgroundColor = `rgba(${CF_GREEN}, ${alpha.toFixed(3)})`;
             solvedSq.style.cursor = 'pointer';
-            solvedSq.title = `${solved} solved`;
+            solvedSq.title        = `${solved} solved`;
             solvedSq.dataset.count = solved;
             solvedSq.addEventListener('click', e => {
               e.stopPropagation();
@@ -585,12 +586,11 @@
             solvedSq.classList.add('cfmatrix-sq-inactive');
           }
 
-          // Attempted square
           if (attempted > 0) {
             const alpha = maxAttempted > 0 ? Math.max(0.12, attempted / maxAttempted) : 0.12;
             attemptedSq.style.backgroundColor = `rgba(${CF_ORANGE}, ${alpha.toFixed(3)})`;
             attemptedSq.style.cursor = 'pointer';
-            attemptedSq.title = `${attempted} attempted`;
+            attemptedSq.title        = `${attempted} attempted`;
             attemptedSq.dataset.count = attempted;
             attemptedSq.addEventListener('click', e => {
               e.stopPropagation();
@@ -615,23 +615,20 @@
   }
 
   /* ================================================================
-     OVERLAY CARD (problem list)
+     OVERLAY CARD
   ================================================================ */
-  let _activeOverlay = null; // { td, type, overlayTr }
+  let _activeOverlay = null;
 
   function problemUrl(contestId, index) {
     return `https://codeforces.com/problemset/problem/${contestId}/${index}`;
   }
 
   function toggleOverlay(td, tag, rating, type, problems) {
-    // Toggle off if same cell+type
     if (_activeOverlay && _activeOverlay.td === td && _activeOverlay.type === type) {
-      closeOverlay();
-      return;
+      closeOverlay(); return;
     }
     closeOverlay();
 
-    /* Build card */
     const card = document.createElement('div');
     card.className = 'cfmatrix-overlay-card';
 
@@ -640,44 +637,48 @@
 
     const header = document.createElement('div');
     header.className = 'cfmatrix-overlay-header';
-    header.innerHTML =
-      `<span style="color:${typeColor};font-weight:bold;">${typeLabel}</span>` +
-      `<span class="cfmatrix-overlay-subtitle">${tagLabel(tag)} · ${rating}</span>` +
-      `<button class="cfmatrix-overlay-close" title="Close">✕</button>`;
 
-    header.querySelector('.cfmatrix-overlay-close').addEventListener('click', e => {
-      e.stopPropagation();
-      closeOverlay();
-    });
+    const typeSpan = document.createElement('span');
+    typeSpan.style.color      = typeColor;
+    typeSpan.style.fontWeight = 'bold';
+    typeSpan.textContent      = typeLabel;
+
+    const subtitle = document.createElement('span');
+    subtitle.className   = 'cfmatrix-overlay-subtitle';
+    subtitle.textContent = `${tagLabel(tag)} · ${rating}`;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className   = 'cfmatrix-overlay-close';
+    closeBtn.title       = 'Close';
+    closeBtn.textContent = '✕';
+    closeBtn.addEventListener('click', e => { e.stopPropagation(); closeOverlay(); });
+
+    header.appendChild(typeSpan);
+    header.appendChild(subtitle);
+    header.appendChild(closeBtn);
 
     const list = document.createElement('div');
     list.className = 'cfmatrix-overlay-list';
 
     for (const prob of problems) {
       const a = document.createElement('a');
-      a.href = problemUrl(prob.contestId, prob.index);
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
+      a.href      = problemUrl(prob.contestId, prob.index);
+      a.target    = '_blank';
+      a.rel       = 'noopener noreferrer';
       a.className = 'cfmatrix-prob-link';
-
-      // Plain text node so long names wrap naturally (white-space: normal on the <a>).
-      // The rating badge is a separate inline <span> that never forces line breaks.
       a.appendChild(document.createTextNode(`${prob.contestId}${prob.index}. ${prob.name}`));
-
       if (prob.rating) {
         const badge = document.createElement('span');
-        badge.className = 'cfmatrix-prob-rating';
+        badge.className   = 'cfmatrix-prob-rating';
         badge.textContent = ` [${prob.rating}]`;
         a.appendChild(badge);
       }
-
       list.appendChild(a);
     }
 
     card.appendChild(header);
     card.appendChild(list);
 
-    /* Inject as new <tr> directly beneath current row */
     const tr = td.closest('tr');
     if (!tr) return;
 
@@ -686,7 +687,7 @@
     overlayTr.className = 'cfmatrix-overlay-tr';
 
     const overlayTd = document.createElement('td');
-    overlayTd.colSpan = colCount;
+    overlayTd.colSpan   = colCount;
     overlayTd.className = 'cfmatrix-overlay-td';
     overlayTd.appendChild(card);
     overlayTr.appendChild(overlayTd);
@@ -698,10 +699,7 @@
   }
 
   function closeOverlay() {
-    if (_activeOverlay) {
-      _activeOverlay.overlayTr.remove();
-      _activeOverlay = null;
-    }
+    if (_activeOverlay) { _activeOverlay.overlayTr.remove(); _activeOverlay = null; }
   }
 
   document.addEventListener('click', closeOverlay);
@@ -709,10 +707,10 @@
   /* ================================================================
      MAIN RENDER ORCHESTRATOR
   ================================================================ */
-  function renderMatrix(widget, { cellMap, sortedTags, maxRating, handle, savedState, isGhost }) {
+  function renderMatrix(widget, { cellMap, sortedTags, maxRating, handle, savedState, isGhost, wasPaginated }) {
     widget.innerHTML = '';
 
-    /* ---- Resolve initial active state ---- */
+    /* Resolve initial state */
     let activeTags    = [];
     let activeRatings = [];
 
@@ -727,34 +725,38 @@
       activeRatings = buildRatingWindow(getRatingFromDOM());
     }
 
-    // Safety: ensure window is always exactly 6 columns
     if (activeRatings.length !== COLUMN_WINDOW) {
       activeRatings = buildRatingWindow(activeRatings[0] || 1000);
     }
 
     const allTags = isGhost ? [...GHOST_TAGS] : [...sortedTags];
 
-    /* ---- Persistence ---- */
     function persist() {
-      saveState(handle, {
-        activeTags    : [...activeTags],
-        activeRatings : [...activeRatings]
-      });
+      saveState(handle, { activeTags: [...activeTags], activeRatings: [...activeRatings] });
     }
 
-    /* ---- Widget header strip ---- */
+    /* Header bar */
     const headerBar = document.createElement('div');
     headerBar.className = 'cfmatrix-header-bar';
 
     const titleSpan = document.createElement('span');
-    titleSpan.className = 'cfmatrix-title';
-    titleSpan.textContent = 'Matrix Analysis';
+    titleSpan.className   = 'cfmatrix-title';
+    titleSpan.textContent = WIDGET_TITLE;
     headerBar.appendChild(titleSpan);
 
-    // Right-side group: legend + reset emoji — built after buildControlBar runs
     widget.appendChild(headerBar);
 
-    /* ---- Table container (re-built on every state change) ---- */
+    /* GAP 2: Paginated-data info banner */
+    if (wasPaginated) {
+      const banner = document.createElement('div');
+      banner.className = 'cfmatrix-info-banner';
+      const txt = document.createElement('span');
+      txt.textContent = `ℹ All ${(cellMap.size ? 'submissions' : 'data')} fetched across multiple pages — complete data loaded.`;
+      banner.appendChild(txt);
+      widget.appendChild(banner);
+    }
+
+    /* Table container */
     let tableWrap = null;
 
     function renderTable() {
@@ -763,6 +765,19 @@
 
       tableWrap = document.createElement('div');
       tableWrap.className = 'cfmatrix-table-wrap';
+
+      /* BUG FIX: if user deselected all topics, show a placeholder,
+         NOT a silent fallback to the top-8 default */
+      if (!isGhost && activeTags.length === 0) {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'cfmatrix-empty-placeholder';
+        const msg = document.createElement('span');
+        msg.textContent = 'No topics selected — open the Topics dropdown to choose topics.';
+        placeholder.appendChild(msg);
+        tableWrap.appendChild(placeholder);
+        widget.appendChild(tableWrap);
+        return;
+      }
 
       const displayTags = activeTags.length
         ? activeTags
@@ -773,47 +788,35 @@
       widget.appendChild(tableWrap);
     }
 
-    /* ---- Control bar ---- */
-    const { bar, resetBtn, legend, refreshDropdown, refreshRatingLabel, refreshTopicBtn } = buildControlBar({
-      allTags,
-      activeTags,
-      activeRatings,
+    /* Control bar */
+    const { bar, resetBtn, refreshDropdown, refreshRatingLabel, refreshTopicBtn } =
+      buildControlBar({
+        allTags, activeTags, activeRatings,
 
-      onTagChange() {
-        persist();
-        renderTable();
-      },
+        onTagChange() { persist(); renderTable(); },
+        onRatingShift() { persist(); renderTable(); },
 
-      onRatingShift() {
-        persist();
-        renderTable();
-      },
-
-      onReset() {
-        clearState(handle);
-
-        // Restore baseline
-        if (isGhost) {
-          activeTags.length = 0;
-          GHOST_TAGS.forEach(t => activeTags.push(t));
-          activeRatings.length = 0;
-          GHOST_RATINGS.forEach(r => activeRatings.push(r));
-        } else {
-          activeTags.length = 0;
-          sortedTags.slice(0, 8).forEach(t => activeTags.push(t));
-          activeRatings.length = 0;
-          buildRatingWindow(getRatingFromDOM()).forEach(r => activeRatings.push(r));
+        onReset() {
+          clearState(handle);
+          if (isGhost) {
+            activeTags.length = 0;
+            GHOST_TAGS.forEach(t => activeTags.push(t));
+            activeRatings.length = 0;
+            GHOST_RATINGS.forEach(r => activeRatings.push(r));
+          } else {
+            activeTags.length = 0;
+            sortedTags.slice(0, 8).forEach(t => activeTags.push(t));
+            activeRatings.length = 0;
+            buildRatingWindow(getRatingFromDOM()).forEach(r => activeRatings.push(r));
+          }
+          refreshRatingLabel();
+          refreshDropdown();
+          refreshTopicBtn();
+          renderTable();
         }
+      });
 
-        // Sync control bar UI
-        refreshRatingLabel();
-        refreshDropdown();
-        refreshTopicBtn();
-        renderTable();
-      }
-    });
-
-    // Header right group: reset emoji pinned to far right of header
+    /* Header right group: reset button only — legend lives in the control bar */
     const headerRight = document.createElement('div');
     headerRight.className = 'cfmatrix-header-right';
     headerRight.appendChild(resetBtn);
@@ -824,44 +827,47 @@
   }
 
   /* ================================================================
-     ENTRY POINT — runs automatically on page load
+     ENTRY POINT
   ================================================================ */
   async function init() {
     const handle = getHandle();
     if (!handle) return;
 
-    /* Inject panel immediately so user sees it straight away */
     const widget = createAndInjectPanel();
     renderLoading(widget);
 
-    /* Load persisted state and fetch API in parallel */
-    let savedState, submissions;
-    try {
-      [savedState, submissions] = await Promise.all([
-        loadState(handle),
-        fetchSubmissions(handle)
-      ]);
-    } catch (err) {
-      renderError(widget, err.message);
-      return;
+    async function load() {
+      let savedState, fetchResult;
+      try {
+        [savedState, fetchResult] = await Promise.all([
+          loadState(handle),
+          fetchSubmissions(handle)
+        ]);
+      } catch (err) {
+        renderError(widget, err.message);
+        return;
+      }
+
+      const { submissions, wasPaginated } = fetchResult;
+
+      let cellMap, sortedTags, maxRating;
+      let isGhost = false;
+
+      if (!submissions || submissions.length === 0) {
+        isGhost    = true;
+        cellMap    = new Map();
+        sortedTags = [...GHOST_TAGS];
+        maxRating  = 1300;
+      } else {
+        ({ cellMap, sortedTags, maxRating } = parseSubmissions(submissions));
+      }
+
+      renderMatrix(widget, { cellMap, sortedTags, maxRating, handle, savedState, isGhost, wasPaginated });
     }
 
-    let cellMap, sortedTags, maxRating;
-    let isGhost = false;
-
-    if (!submissions || submissions.length === 0) {
-      isGhost    = true;
-      cellMap    = new Map();
-      sortedTags = [...GHOST_TAGS];
-      maxRating  = 1300;
-    } else {
-      ({ cellMap, sortedTags, maxRating } = parseSubmissions(submissions));
-    }
-
-    renderMatrix(widget, { cellMap, sortedTags, maxRating, handle, savedState, isGhost });
+    load();
   }
 
-  /* Boot */
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
