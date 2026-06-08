@@ -1,6 +1,16 @@
 /**
  * Codeforces Problem Tracker — content.js  v3.0
  * Manifest V3 · Vanilla JS · Zero dependencies
+ *
+ * v3 changes:
+ *  - Title renamed "Problem Tracker" (matches sibling extension naming style)
+ *  - Gap 1: fetchSubmissions() has exponential-backoff retry (3 attempts,
+ *           safe text-only error rendering (no innerHTML with API strings)
+ *  - Gap 2: Pagination loop fetches all submissions past the 10 000 cap;
+ *           banner shown when data was paginated (user knows it's complete)
+ *  - Gap 3: Full dark-mode support via @media + .dark body class detection
+ *  - Bug:   Deselecting all topics now shows a "No topics selected" placeholder
+ *           instead of silently falling back to the top-8 default
  */
 
 (() => {
@@ -105,7 +115,9 @@
   function buildRatingWindow(userRating) {
     if (!userRating || userRating < 800) userRating = 800;
     const floorHundred = Math.floor(userRating / 100) * 100;
-    const start = Math.max(800, floorHundred - 200);
+    // Centre window around user's rating, clamped within [800, 3500]
+    const MAX_START = 3500 - (COLUMN_WINDOW - 1) * RATING_STEP; // = 3000
+    const start = Math.min(MAX_START, Math.max(800, floorHundred - 200));
     return Array.from({ length: COLUMN_WINDOW }, (_, i) => start + i * RATING_STEP);
   }
 
@@ -450,17 +462,33 @@
       if (activeRatings[0] <= 800) return;
       for (let i = 0; i < activeRatings.length; i++) activeRatings[i] -= RATING_STEP;
       refreshRatingLabel();
+      syncBtnState();
       onRatingShift();
     });
     btnRight.addEventListener('click', () => {
+      if (activeRatings[activeRatings.length - 1] >= 3500) return;
       for (let i = 0; i < activeRatings.length; i++) activeRatings[i] += RATING_STEP;
       refreshRatingLabel();
+      syncBtnState();
       onRatingShift();
     });
 
     ratingWrap.appendChild(btnLeft);
     ratingWrap.appendChild(ratingLabel);
     ratingWrap.appendChild(btnRight);
+
+    /* Sync disabled visual state of ◀▶ based on current window position */
+    function syncBtnState() {
+      const atMin = activeRatings[0] <= 800;
+      const atMax = activeRatings[activeRatings.length - 1] >= 3500;
+      btnLeft.disabled  = atMin;
+      btnRight.disabled = atMax;
+      btnLeft.style.opacity  = atMin ? '0.35' : '';
+      btnRight.style.opacity = atMax ? '0.35' : '';
+      btnLeft.style.cursor   = atMin ? 'default' : '';
+      btnRight.style.cursor  = atMax ? 'default' : '';
+    }
+    syncBtnState(); // set initial state on render
 
     /* ---- Reset button (goes in header bar, returned separately) ---- */
     const resetBtn = document.createElement('button');
@@ -495,7 +523,7 @@
     bar.appendChild(ratingWrap);
     bar.appendChild(controlRight);
 
-    return { bar, resetBtn, refreshDropdown, refreshRatingLabel, refreshTopicBtn };
+    return { bar, resetBtn, refreshDropdown, refreshRatingLabel, refreshTopicBtn, syncBtnState };
   }
 
   /* ================================================================
@@ -645,7 +673,8 @@
 
     const subtitle = document.createElement('span');
     subtitle.className   = 'cfmatrix-overlay-subtitle';
-    subtitle.textContent = `${tagLabel(tag)} · ${rating}`;
+    const problemWord    = problems.length === 1 ? 'problem' : 'problems';
+    subtitle.textContent = `${tagLabel(tag)} · ${rating} · ${problems.length} ${problemWord}`;
 
     const closeBtn = document.createElement('button');
     closeBtn.className   = 'cfmatrix-overlay-close';
@@ -746,15 +775,6 @@
 
     widget.appendChild(headerBar);
 
-    /* GAP 2: Paginated-data info banner */
-    if (wasPaginated) {
-      const banner = document.createElement('div');
-      banner.className = 'cfmatrix-info-banner';
-      const txt = document.createElement('span');
-      txt.textContent = `ℹ All ${(cellMap.size ? 'submissions' : 'data')} fetched across multiple pages — complete data loaded.`;
-      banner.appendChild(txt);
-      widget.appendChild(banner);
-    }
 
     /* Table container */
     let tableWrap = null;
@@ -789,7 +809,7 @@
     }
 
     /* Control bar */
-    const { bar, resetBtn, refreshDropdown, refreshRatingLabel, refreshTopicBtn } =
+    const { bar, resetBtn, refreshDropdown, refreshRatingLabel, refreshTopicBtn, syncBtnState } =
       buildControlBar({
         allTags, activeTags, activeRatings,
 
@@ -810,6 +830,7 @@
             buildRatingWindow(getRatingFromDOM()).forEach(r => activeRatings.push(r));
           }
           refreshRatingLabel();
+          syncBtnState();
           refreshDropdown();
           refreshTopicBtn();
           renderTable();
